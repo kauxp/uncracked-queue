@@ -7,7 +7,8 @@ namespace QueueDungeon.Entities {
     public class ObstacleController : MonoBehaviour {
         [Header("UI Display")]
         public string label = "patrol guard";
-        public Color displayColor = new Color(0.9f, 0.5f, 0.1f);
+        public Color displayColor = new Color(0.9f, 0.25f, 0.2f);
+        public ObstacleShape shape = ObstacleShape.Circle;
 
         [Header("Movement")]
         public Vector2Int startGridPosition = new Vector2Int(5, 5);
@@ -52,13 +53,15 @@ namespace QueueDungeon.Entities {
 
             Vector2Int nextPos = gridPosition + new MoveCommand(dir).ToOffset();
 
-            if (GridManager.Instance.IsValidPosition(nextPos)) {
+            if (GridManager.Instance != null && GridManager.Instance.IsValidPosition(nextPos)) {
                 gridPosition = nextPos;
+                CheckPlayerHit();
                 StopAllCoroutines();
                 StartCoroutine(SmoothMove(GridManager.Instance.GridToWorld(gridPosition)));
+            } else {
+                // Can't move — still check for player collision at current position
+                CheckPlayerHit();
             }
-
-            CheckPlayerHit();
         }
 
         private IEnumerator SmoothMove(Vector3 dest) {
@@ -67,14 +70,16 @@ namespace QueueDungeon.Entities {
                 yield return null;
             }
             transform.position = dest;
+            // Only check collision after movement is complete
             CheckPlayerHit();
         }
 
         private void CheckPlayerHit() {
-            PlayerController p = FindObjectOfType<PlayerController>();
+            PlayerController p = FindAnyObjectByType<PlayerController>();
             if (p != null && p.gridPosition == gridPosition) {
                 p.HitObstacle();
             }
         }
+
     }
 }

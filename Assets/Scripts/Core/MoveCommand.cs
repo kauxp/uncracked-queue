@@ -19,11 +19,11 @@ namespace QueueDungeon.Core {
 
         public string ToArrow() {
             switch (Direction) {
-                case Direction.Up:    return "↑";
-                case Direction.Down:  return "↓";
-                case Direction.Left:  return "←";
-                case Direction.Right: return "→";
-                default:              return "·";
+                case Direction.Up:    return "^";
+                case Direction.Down:  return "v";
+                case Direction.Left:  return "<";
+                case Direction.Right: return ">";
+                default:              return "-";
             }
         }
     }

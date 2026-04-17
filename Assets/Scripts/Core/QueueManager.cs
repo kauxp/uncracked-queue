@@ -10,6 +10,7 @@ namespace QueueDungeon.Core {
 
         private Queue<MoveCommand> queue = new Queue<MoveCommand>();
         private GameState currentState = GameState.Start;
+        private bool inputReceivedSinceLastTick = false;
 
         private void Awake() {
             if (Instance == null) Instance = this;
@@ -35,6 +36,7 @@ namespace QueueDungeon.Core {
         private void ResetQueueSize() {
             currentMaxSize = baseMaxSize;
             queue.Clear();
+            inputReceivedSinceLastTick = false;
             Broadcast();
         }
 
@@ -47,18 +49,30 @@ namespace QueueDungeon.Core {
             if (currentState == GameState.Stop || currentState == GameState.Win) return;
             if (queue.Count >= currentMaxSize) return;
             queue.Enqueue(new MoveCommand(dir));
+            inputReceivedSinceLastTick = true;
             Broadcast();
         }
 
         private void ExecuteNext() {
+            // Queue completely empty → GAME OVER
             if (queue.Count == 0) {
-                // Queue empty = Game Over
                 CoreEventManager.OnStopClicked?.Invoke();
                 return;
             }
 
+            // Player didn't enter any input since last tick → PENALTY (grow queue)
+            if (!inputReceivedSinceLastTick) {
+                currentMaxSize++;
+                CoreEventManager.OnPenalty?.Invoke();
+            }
+
+            // Pop and execute the front command
             MoveCommand cmd = queue.Dequeue();
             CoreEventManager.OnMoveExecuted?.Invoke(cmd);
+
+            // Reset the input flag for next tick
+            inputReceivedSinceLastTick = false;
+
             Broadcast();
         }
 
@@ -70,8 +84,6 @@ namespace QueueDungeon.Core {
         public int Count => queue.Count;
 
         private void Broadcast() {
-            // Need to pass maxSize info if UI renders it dynamically, 
-            // but UIManager can read QueueManager.Instance.currentMaxSize directly.
             CoreEventManager.OnQueueUpdated?.Invoke(new List<MoveCommand>(queue));
         }
     }

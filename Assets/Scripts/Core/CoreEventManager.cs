@@ -19,5 +19,7 @@ namespace QueueDungeon.Core {
         public static Action OnTogglePauseClicked;
         public static Action OnPlayerReachedExit;
         public static Action OnEntitiesSpawned;
+        public static Action<int> OnRoundCompleted;
+        public static Action OnContinueClicked;
     }
 }

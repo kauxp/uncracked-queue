@@ -11,6 +11,7 @@ namespace QueueDungeon.Entities {
         
         [HideInInspector] public Vector2Int gridPosition;
         private Color originalColor;
+        private Vector3 originalScale;
         private SpriteRenderer spriteRenderer;
         private bool hasKey = false;
 
@@ -18,6 +19,7 @@ namespace QueueDungeon.Entities {
             spriteRenderer = GetComponent<SpriteRenderer>();
             originalColor = spriteRenderer.color;
             gridPosition = startGridPosition;
+            originalScale = transform.localScale;
             SnapToGrid();
         }
 
@@ -46,19 +48,30 @@ namespace QueueDungeon.Entities {
                 transform.position = GridManager.Instance.GridToWorld(gridPosition);
         }
 
+        private void CheckObstacleHit() {
+            var obstacles = FindObjectsByType<ObstacleController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var obs in obstacles) {
+                if (obs.gridPosition == this.gridPosition) {
+                    HitObstacle();
+                    return;
+                }
+            }
+        }
+
         private void HandleMove(MoveCommand cmd) {
             Vector2Int targetPos = gridPosition + cmd.ToOffset();
 
             if (GridManager.Instance != null && GridManager.Instance.IsValidPosition(targetPos)) {
                 gridPosition = targetPos;
+                CheckObstacleHit();
+
                 StopAllCoroutines();
                 StartCoroutine(SmoothMove(GridManager.Instance.GridToWorld(gridPosition)));
                 
                 var gm = FindAnyObjectByType<GameManager>();
                 if (gm != null) gm.IncrementScore();
-            } else {
-                CoreEventManager.OnStopClicked?.Invoke(); // Hit boundary, game over!
             }
+            // If position is invalid (wall), just stay in place — no game over
         }
 
         private IEnumerator SmoothMove(Vector3 dest) {
@@ -67,20 +80,24 @@ namespace QueueDungeon.Entities {
                 yield return null;
             }
             transform.position = dest;
+            CheckObstacleHit();
         }
 
         private void HandlePenalty() {
-            StartCoroutine(PenaltyRoutine());
+            // Screen flash is handled by UIManager; keeping this for future 
+            // subtle non-color effects (like screen shake or scale pulse)
+            StartCoroutine(PenaltyPulse());
         }
 
-        private IEnumerator PenaltyRoutine() {
-            if (spriteRenderer != null) spriteRenderer.color = flashColor;
-            yield return new WaitForSeconds(0.15f);
-            if (spriteRenderer != null) spriteRenderer.color = originalColor;
+        private IEnumerator PenaltyPulse() {
+            // Subtle scale pulse instead of color flash
+            transform.localScale = originalScale * 1.2f;
+            yield return new WaitForSeconds(0.1f);
+            transform.localScale = originalScale;
         }
 
         public void HitObstacle() {
-            // Collision with obstacle -> lose
+            // Only Player-Obstacle collision causes game over
             CoreEventManager.OnStopClicked?.Invoke();
         }
 
@@ -91,10 +108,13 @@ namespace QueueDungeon.Entities {
         private void OnTriggerEnter2D(Collider2D other) {
             if (other.CompareTag("Key")) {
                 CoreEventManager.OnKeyCollected?.Invoke();
-                other.gameObject.SetActive(false);
+                Destroy(other.gameObject);
             }
             else if (other.CompareTag("Exit") && hasKey) {
                 CoreEventManager.OnPlayerReachedExit?.Invoke();
+            }
+            else if (other.GetComponent<ObstacleController>() != null) {
+                HitObstacle();
             }
         }
     }

@@ -2,24 +2,23 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace QueueDungeon.Core {
-    public enum Difficulty { Easy, Medium, Hard }
-
     public class GameManager : MonoBehaviour {
         public GameState CurrentState { get; private set; } = GameState.Start;
 
         [Header("Survival Settings")]
-        public Difficulty difficulty = Difficulty.Medium;
         public int score = 0;
 
-        private float tickRate = 0.35f;
+        private float tickRate = 0.6f;
         private float tickTimer;
+        private bool initialized = false;
 
         private void OnEnable() {
             CoreEventManager.OnRunClicked += StartRun;
             CoreEventManager.OnStopClicked += GameOver;
             CoreEventManager.OnTogglePauseClicked += TogglePause;
             CoreEventManager.OnRestartClicked += Restart;
-            CoreEventManager.OnPlayerReachedExit += WinGame; // Optional now
+            CoreEventManager.OnPlayerReachedExit += WinGame;
+            CoreEventManager.OnContinueClicked += ContinueRound;
         }
 
         private void OnDisable() {
@@ -28,20 +27,16 @@ namespace QueueDungeon.Core {
             CoreEventManager.OnTogglePauseClicked -= TogglePause;
             CoreEventManager.OnRestartClicked -= Restart;
             CoreEventManager.OnPlayerReachedExit -= WinGame;
+            CoreEventManager.OnContinueClicked -= ContinueRound;
         }
 
         private void Start() {
-            SetDifficultySpeed();
+            // Force-fire the initial state event (bypassing the same-state guard)
+            initialized = false;
             ChangeState(GameState.Start);
         }
 
-        private void SetDifficultySpeed() {
-            switch (difficulty) {
-                case Difficulty.Easy: tickRate = 0.5f; break;
-                case Difficulty.Medium: tickRate = 0.35f; break;
-                case Difficulty.Hard: tickRate = 0.2f; break;
-            }
-        }
+
 
         private void Update() {
             if (CurrentState == GameState.Run) {
@@ -59,14 +54,15 @@ namespace QueueDungeon.Core {
         }
 
         private void ChangeState(GameState s) {
-            if (CurrentState == s) return;
+            // Allow first call even if state matches (initialization)
+            if (initialized && CurrentState == s) return;
+            initialized = true;
             CurrentState = s;
             if (s == GameState.Run) tickTimer = 0f;
             CoreEventManager.OnStateChanged?.Invoke(s);
         }
 
         private void StartRun() {
-            SetDifficultySpeed();
             if (CurrentState == GameState.Start || CurrentState == GameState.Stop) score = 0;
             ChangeState(GameState.Run);
         }
@@ -81,9 +77,15 @@ namespace QueueDungeon.Core {
 
         private void Restart() {
             score = 0;
+            initialized = false;
             CoreEventManager.OnClearClicked?.Invoke();
             ChangeState(GameState.Start);
-            SetDifficultySpeed();
+        }
+
+        private void ContinueRound() {
+            initialized = false;
+            CoreEventManager.OnClearClicked?.Invoke();
+            ChangeState(GameState.Start);
         }
 
         public void IncrementScore() {

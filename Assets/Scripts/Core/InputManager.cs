@@ -6,7 +6,15 @@ namespace QueueDungeon.Core {
         private GameState currentState = GameState.Start;
 
         private void OnEnable() {
-            CoreEventManager.OnStateChanged += s => currentState = s;
+            CoreEventManager.OnStateChanged += HandleStateChanged;
+        }
+
+        private void OnDisable() {
+            CoreEventManager.OnStateChanged -= HandleStateChanged;
+        }
+
+        private void HandleStateChanged(GameState s) {
+            currentState = s;
         }
 
         private void Update() {
